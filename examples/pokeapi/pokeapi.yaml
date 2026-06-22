@@ -1,0 +1,233 @@
+openapi: 3.0.3
+info:
+  title: PokeAPI (subset)
+  version: "2.0.0"
+  description: >
+    A hand-written OpenAPI contract for the slice of the public PokeAPI
+    (https://pokeapi.co) used by the demo Pokedex app. PokeAPI needs no API key
+    and sends permissive CORS headers, so a browser can call it directly.
+
+    This file is the *input* to spec2md. Run `npx spec2md examples/pokeapi/pokeapi.yaml`
+    to regenerate the committed pokeapi.api.md / pokeapi.mcp.md next to it.
+
+servers:
+  - url: https://pokeapi.co/api/v2
+
+tags:
+  - name: pokemon
+    description: Pokemon resources
+  - name: types
+    description: Damage types
+
+paths:
+  /pokemon:
+    get:
+      tags: [pokemon]
+      summary: List Pokemon (paginated)
+      operationId: listPokemon
+      parameters:
+        - name: limit
+          in: query
+          description: How many results per page
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          description: Offset into the full list
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: A page of named resources
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NamedResourceList"
+
+  /pokemon/{name}:
+    get:
+      tags: [pokemon]
+      summary: Get a Pokemon by name or id
+      operationId: getPokemon
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Pokemon name (e.g. "pikachu") or numeric id
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The Pokemon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pokemon"
+        "404":
+          description: Not found
+
+  /type/{name}:
+    get:
+      tags: [types]
+      summary: Get a damage type by name
+      operationId: getType
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Type name (e.g. "fire")
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The type and its damage relations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Type"
+
+components:
+  schemas:
+    NamedResource:
+      type: object
+      required: [name, url]
+      properties:
+        name:
+          type: string
+          description: Resource name
+        url:
+          type: string
+          format: uri
+          description: Canonical URL of the resource
+
+    NamedResourceList:
+      type: object
+      required: [count, results]
+      properties:
+        count:
+          type: integer
+          description: Total number of resources available
+        next:
+          type: string
+          format: uri
+          nullable: true
+          description: URL of the next page, or null on the last page
+        previous:
+          type: string
+          format: uri
+          nullable: true
+          description: URL of the previous page, or null on the first page
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/NamedResource"
+
+    PokemonType:
+      type: object
+      required: [slot, type]
+      properties:
+        slot:
+          type: integer
+          description: Order of the type on the Pokemon
+        type:
+          $ref: "#/components/schemas/NamedResource"
+
+    PokemonStat:
+      type: object
+      required: [base_stat, stat]
+      properties:
+        base_stat:
+          type: integer
+          description: The base value of the stat (0-255)
+        effort:
+          type: integer
+          description: Effort points (EV) the Pokemon yields
+        stat:
+          $ref: "#/components/schemas/NamedResource"
+
+    PokemonAbility:
+      type: object
+      required: [ability]
+      properties:
+        is_hidden:
+          type: boolean
+          description: Whether this is a hidden ability
+        slot:
+          type: integer
+        ability:
+          $ref: "#/components/schemas/NamedResource"
+
+    PokemonSprites:
+      type: object
+      properties:
+        front_default:
+          type: string
+          format: uri
+          nullable: true
+          description: Default front sprite image URL
+        front_shiny:
+          type: string
+          format: uri
+          nullable: true
+          description: Shiny front sprite image URL
+
+    Pokemon:
+      type: object
+      required: [id, name, height, weight, types]
+      properties:
+        id:
+          type: integer
+          description: Pokedex id
+        name:
+          type: string
+        base_experience:
+          type: integer
+          description: Base experience gained for defeating this Pokemon
+        height:
+          type: integer
+          description: Height in decimetres
+        weight:
+          type: integer
+          description: Weight in hectograms
+        sprites:
+          $ref: "#/components/schemas/PokemonSprites"
+        types:
+          type: array
+          description: One or two damage types
+          items:
+            $ref: "#/components/schemas/PokemonType"
+        stats:
+          type: array
+          items:
+            $ref: "#/components/schemas/PokemonStat"
+        abilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/PokemonAbility"
+
+    Type:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        damage_relations:
+          $ref: "#/components/schemas/TypeDamageRelations"
+
+    TypeDamageRelations:
+      type: object
+      properties:
+        double_damage_from:
+          type: array
+          description: Types this type takes double damage from
+          items:
+            $ref: "#/components/schemas/NamedResource"
+        double_damage_to:
+          type: array
+          description: Types this type deals double damage to
+          items:
+            $ref: "#/components/schemas/NamedResource"

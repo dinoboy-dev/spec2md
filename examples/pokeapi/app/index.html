@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pokédex — built from a spec2md contract</title>
+<!--
+  A single-file Pokédex written by reading the spec2md-generated contract in
+  ../pokeapi.mcp.md. The whole integration came from this one block of it:
+
+    BASE_URL: https://pokeapi.co/api/v2
+
+    ### GET /pokemon/{name}
+    Get a Pokemon by name or id | id=getPokemon
+    params: name:path:string!
+    returns 200 The Pokemon
+    response_example: {"id":0,"name":"string","height":0,"weight":0,
+      "sprites":{"front_default":"string", ...},
+      "types":[{"slot":0,"type":{"name":"string","url":"string"}}],
+      "stats":[{"base_stat":0,"stat":{"name":"string", ...}}],
+      "abilities":[{"is_hidden":true,"ability":{"name":"string", ...}}]}
+
+  No API key, CORS is open — just open this file in any browser.
+-->
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #151e30;
+    --panel-2: #1d293f;
+    --text: #e6edf6;
+    --muted: #8b9bb4;
+    --border: #2a3650;
+    --accent: #ef4444;
+    --type: #6b7280; /* overwritten per-Pokémon by its primary type colour */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1100px 500px at 50% -15%, #1b2742, var(--bg));
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 2rem 1rem 3rem;
+  }
+  main { width: 100%; max-width: 560px; }
+  h1 { font-size: 1.5rem; margin: 0 0 0.2rem; display: flex; align-items: center; gap: 0.5rem; }
+  .sub { color: var(--muted); font-size: 0.88rem; margin: 0 0 1.4rem; }
+  .sub code { background: var(--panel-2); padding: 0.1rem 0.35rem; border-radius: 5px; }
+
+  form { display: flex; gap: 0.5rem; margin-bottom: 0.85rem; }
+  input {
+    flex: 1; background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.7rem 0.9rem; font-size: 1rem;
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button {
+    background: var(--accent); color: #fff; border: 0; border-radius: 10px;
+    padding: 0 1.1rem; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+  }
+  button.ghost { background: var(--panel); color: var(--text); border: 1px solid var(--border); }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 1.4rem; }
+  .chip {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: 999px; padding: 0.35rem 0.8rem; font-size: 0.82rem; cursor: pointer;
+    text-transform: capitalize;
+  }
+  .chip:hover { border-color: var(--type); }
+
+  .card {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--type) 22%, var(--panel)), var(--panel));
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--type);
+    border-radius: 18px; padding: 1.5rem;
+  }
+  .status { color: var(--muted); text-align: center; padding: 2.5rem 0; }
+  .head { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+  .sprite {
+    width: 120px; height: 120px; image-rendering: pixelated;
+    background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--type) 30%, transparent), transparent 65%);
+    border-radius: 14px; flex-shrink: 0;
+  }
+  .name { font-size: 1.7rem; font-weight: 700; text-transform: capitalize; line-height: 1.1; }
+  .dex { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .types { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
+  .badge {
+    color: #fff; border-radius: 999px; padding: 0.2rem 0.7rem;
+    font-size: 0.78rem; font-weight: 600; text-transform: capitalize;
+    text-shadow: 0 1px 1px rgba(0,0,0,.25);
+  }
+  .facts { display: flex; gap: 1.5rem; margin: 0.25rem 0 1.1rem; }
+  .fact .k { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: .04em; }
+  .fact .v { font-size: 1.05rem; font-weight: 600; }
+
+  .stats { display: grid; gap: 0.5rem; }
+  .stat { display: grid; grid-template-columns: 110px 34px 1fr; align-items: center; gap: 0.6rem; }
+  .stat .label { color: var(--muted); font-size: 0.8rem; text-transform: capitalize; }
+  .stat .num { font-variant-numeric: tabular-nums; font-size: 0.85rem; text-align: right; }
+  .bar { height: 8px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--type); border-radius: 999px; transition: width .5s ease; }
+
+  .abilities { margin-top: 1.1rem; color: var(--muted); font-size: 0.85rem; }
+  .abilities b { color: var(--text); }
+  footer { margin-top: 1.5rem; text-align: center; color: var(--muted); font-size: 0.8rem; }
+  a { color: #93c5fd; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🔴 Pokédex</h1>
+  <p class="sub">A demo client built from a spec2md <code>.mcp.md</code> contract for <a href="https://pokeapi.co" target="_blank" rel="noopener">PokeAPI</a>.</p>
+
+  <form id="search">
+    <input id="q" placeholder="Search a Pokémon: pikachu, 6, gengar…" autocomplete="off" />
+    <button type="submit">Search</button>
+    <button type="button" class="ghost" id="random" title="Random Pokémon">🎲</button>
+  </form>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="card" id="card"><div class="status">Loading…</div></div>
+
+  <footer>Data by <a href="https://pokeapi.co" target="_blank" rel="noopener">PokeAPI</a> · UI written from <code>spec2md</code> output</footer>
+</main>
+
+<script>
+  // --- straight from ../pokeapi.mcp.md -------------------------------------
+  const BASE_URL = "https://pokeapi.co/api/v2";
+
+  // GET /pokemon/{name}  (name:path:string!)
+  async function getPokemon(name) {
+    const res = await fetch(`${BASE_URL}/pokemon/${encodeURIComponent(String(name).toLowerCase().trim())}`);
+    if (res.status === 404) throw new Error(`No Pokémon called "${name}"`);
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    return res.json();
+  }
+
+  // Official Pokémon type colours.
+  const TYPE_COLORS = {
+    normal: "#A8A77A", fire: "#EE8130", water: "#6390F0", electric: "#F7D02C",
+    grass: "#7AC74C", ice: "#96D9D6", fighting: "#C22E28", poison: "#A33EA1",
+    ground: "#E2BF65", flying: "#A98FF3", psychic: "#F95587", bug: "#A6B91A",
+    rock: "#B6A136", ghost: "#735797", dragon: "#6F35FC", dark: "#705746",
+    steel: "#B7B7CE", fairy: "#D685AD",
+  };
+
+  const card = document.getElementById("card");
+  const setStatus = (t) => { card.innerHTML = `<div class="status">${t}</div>`; };
+
+  // --- render the response shape described by the contract -----------------
+  function render(p) {
+    const primary = p.types[0]?.type.name || "normal";
+    document.documentElement.style.setProperty("--type", TYPE_COLORS[primary] || "#6b7280");
+
+    const dex = "#" + String(p.id).padStart(4, "0");
+    const sprite = p.sprites?.front_default;
+    const badges = p.types
+      .map((t) => `<span class="badge" style="background:${TYPE_COLORS[t.type.name] || "#777"}">${t.type.name}</span>`)
+      .join("");
+
+    const stats = (p.stats || []).map((s) => {
+      const pct = Math.min(100, Math.round((s.base_stat / 255) * 100));
+      const label = s.stat.name.replace("special-", "sp. ").replace("-", " ");
+      return `
+        <div class="stat">
+          <span class="label">${label}</span>
+          <span class="num">${s.base_stat}</span>
+          <span class="bar"><span style="width:${pct}%"></span></span>
+        </div>`;
+    }).join("");
+
+    const abilities = (p.abilities || [])
+      .map((a) => a.ability.name + (a.is_hidden ? " (hidden)" : ""))
+      .join(", ");
+
+    card.innerHTML = `
+      <div class="head">
+        ${sprite ? `<img class="sprite" src="${sprite}" alt="${p.name}" />` : `<div class="sprite"></div>`}
+        <div>
+          <div class="dex">${dex}</div>
+          <div class="name">${p.name}</div>
+          <div class="types">${badges}</div>
+        </div>
+      </div>
+      <div class="facts">
+        <div class="fact"><div class="k">Height</div><div class="v">${(p.height / 10).toFixed(1)} m</div></div>
+        <div class="fact"><div class="k">Weight</div><div class="v">${(p.weight / 10).toFixed(1)} kg</div></div>
+        <div class="fact"><div class="k">Base XP</div><div class="v">${p.base_experience ?? "—"}</div></div>
+      </div>
+      <div class="stats">${stats}</div>
+      ${abilities ? `<div class="abilities"><b>Abilities:</b> ${abilities}</div>` : ""}`;
+  }
+
+  async function load(name) {
+    setStatus(`Loading ${name}…`);
+    try {
+      render(await getPokemon(name));
+    } catch (err) {
+      setStatus(err.message);
+    }
+  }
+
+  // --- wire up the UI ------------------------------------------------------
+  const STARTERS = ["bulbasaur", "charmander", "squirtle", "pikachu", "eevee", "gengar", "snorlax", "mewtwo"];
+  const chips = document.getElementById("chips");
+  STARTERS.forEach((n) => {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = n;
+    b.onclick = () => load(n);
+    chips.appendChild(b);
+  });
+
+  document.getElementById("search").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = document.getElementById("q").value.trim();
+    if (q) load(q);
+  });
+
+  document.getElementById("random").addEventListener("click", () => {
+    load(1 + Math.floor(Math.random() * 898)); // ids 1..898 are safe to query
+  });
+
+  load("pikachu"); // first paint
+</script>
+</body>
+</html>

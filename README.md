@@ -218,9 +218,32 @@ Example request body:
 
 Zero TypeScript, zero build step, CommonJS, one runtime dependency.
 
-## Demo: a real client built from the output
+## Examples
 
-[`examples/weather-ui/index.html`](examples/weather-ui/index.html) is a single‑file web app that calls the public [Open‑Meteo](https://open-meteo.com/) Forecast API (`GET /v1/forecast`, no API key, CORS‑enabled). The integration code was written by reading a spec2md‑generated `.mcp.md` contract.
+Real clients built from spec2md output — open either HTML file directly in a browser, no server or API key needed.
+
+### Full end‑to‑end walkthrough — [`examples/pokeapi/`](examples/pokeapi/)
+
+The complete loop in one folder: an OpenAPI spec → the generated contract (checked in) → a working **Pokédex** app written from it.
+
+```
+examples/pokeapi/
+├── pokeapi.yaml      # INPUT  — OpenAPI spec for the PokeAPI subset
+├── pokeapi.api.md    # OUTPUT — human reference        (generated, committed)
+├── pokeapi.mcp.md    # OUTPUT — compact agent contract (generated, committed)
+└── app/index.html    # RESULT — a Pokédex built from pokeapi.mcp.md
+```
+
+```bash
+npx spec2md examples/pokeapi/pokeapi.yaml   # regenerate the two .md files
+open examples/pokeapi/app/index.html        # run the Pokédex
+```
+
+See [`examples/pokeapi/README.md`](examples/pokeapi/README.md) for the step‑by‑step story.
+
+### Single‑file demo — [`examples/weather-ui/index.html`](examples/weather-ui/index.html)
+
+A web app that calls the public [Open‑Meteo](https://open-meteo.com/) Forecast API (`GET /v1/forecast`), with its integration code written from a spec2md‑generated `.mcp.md` contract.
 
 ```bash
 # Generate the contract the demo was written from:
