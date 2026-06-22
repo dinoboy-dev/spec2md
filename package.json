@@ -14,7 +14,8 @@
   ],
   "scripts": {
     "test": "node test/run.js",
-    "example": "node bin/spec2md.js examples/swagger.json --base-url https://api.example.com --split"
+    "example": "node bin/spec2md.js examples/swagger.json --base-url https://api.example.com --split",
+    "prepublishOnly": "npm test"
   },
   "engines": {
     "node": ">=18"
