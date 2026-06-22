@@ -15,7 +15,10 @@
   "scripts": {
     "test": "node test/run.js",
     "example": "node bin/spec2md.js examples/swagger.json --base-url https://api.example.com --split",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm test",
+    "release": "npm test && npm version patch -m \"release: v%s\" && git push --follow-tags && npm publish",
+    "release:minor": "npm test && npm version minor -m \"release: v%s\" && git push --follow-tags && npm publish",
+    "release:major": "npm test && npm version major -m \"release: v%s\" && git push --follow-tags && npm publish"
   },
   "engines": {
     "node": ">=18"
