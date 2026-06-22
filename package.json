@@ -1,0 +1,48 @@
+{
+  "name": "spec2md",
+  "version": "1.0.0",
+  "description": "Convert an OpenAPI/Swagger spec (file or live URL) into a clean Markdown API reference and a compact, token-efficient MCP context file for AI coding agents.",
+  "bin": {
+    "spec2md": "bin/spec2md.js"
+  },
+  "main": "src/convert.js",
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/run.js",
+    "example": "node bin/spec2md.js examples/swagger.json --base-url https://api.example.com --split"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "openapi",
+    "swagger",
+    "markdown",
+    "mcp",
+    "nestjs",
+    "llm",
+    "ai-agent",
+    "api",
+    "documentation",
+    "codegen",
+    "context"
+  ],
+  "author": "Nguyễn Thành Đạt <dinoboy.dev@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dinoboy-dev/spec2md.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dinoboy-dev/spec2md/issues"
+  },
+  "homepage": "https://github.com/dinoboy-dev/spec2md#readme",
+  "dependencies": {
+    "@apidevtools/swagger-parser": "^10.1.0"
+  }
+}

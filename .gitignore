@@ -1,0 +1,11 @@
+node_modules/
+npm-debug.log*
+.DS_Store
+
+# Generated artifacts from the example spec / demos
+examples/*.api.md
+examples/*.mcp.md
+examples/*-context/
+
+# Update manifests are generated next to outputs
+**/.spec2md.json

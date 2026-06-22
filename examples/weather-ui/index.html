@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>spec2md demo — Open-Meteo weather</title>
+<!--
+  This single-file app was written by reading a generated .mcp.md contract for
+  the Open-Meteo Forecast API and turning it into integration code by hand.
+
+  How the contract was produced:
+    npx spec2md https://raw.githubusercontent.com/open-meteo/open-meteo/main/openapi.yml --mcp-only
+
+  The relevant endpoint from that contract:
+    ### GET /v1/forecast
+    params: latitude:query:number!, longitude:query:number!,
+            current:query:string[]?, daily:query:string[]?, timezone:query:string?
+    returns 200 with { current: {...}, daily: { time[], temperature_2m_max[], ... } }
+
+  Open-Meteo needs no API key and sends permissive CORS headers, so the browser
+  can call it directly. Open this file in any browser — no server required.
+-->
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #273449;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --border: #334155;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -10%, #1d2b4a, var(--bg));
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  main { width: 100%; max-width: 720px; }
+  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+  .sub { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.9rem; }
+  .cities { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
+  button {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.45rem 0.9rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  button:hover { border-color: var(--accent); }
+  button.active { background: var(--accent); color: #04263a; border-color: var(--accent); font-weight: 600; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+  }
+  .now { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
+  .now .icon { font-size: 3rem; line-height: 1; }
+  .now .temp { font-size: 2.75rem; font-weight: 700; }
+  .now .meta { color: var(--muted); font-size: 0.9rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 0.6rem; }
+  .day {
+    background: var(--panel-2);
+    border-radius: 12px;
+    padding: 0.75rem 0.5rem;
+    text-align: center;
+  }
+  .day .dow { color: var(--muted); font-size: 0.75rem; }
+  .day .dicon { font-size: 1.5rem; margin: 0.3rem 0; }
+  .day .hi { font-weight: 600; }
+  .day .lo { color: var(--muted); font-size: 0.85rem; }
+  .status { color: var(--muted); padding: 1rem 0; }
+  footer { margin-top: 1.5rem; color: var(--muted); font-size: 0.8rem; text-align: center; }
+  code { background: var(--panel-2); padding: 0.1rem 0.35rem; border-radius: 5px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Open-Meteo weather</h1>
+  <p class="sub">A demo client built from a spec2md-generated <code>.mcp.md</code> contract.</p>
+
+  <div class="cities" id="cities"></div>
+  <div class="card" id="card"><div class="status">Pick a city to load the forecast…</div></div>
+
+  <footer>
+    Data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> ·
+    Integration code written from <code>spec2md</code> output
+  </footer>
+</main>
+
+<script>
+  // --- Constants taken straight from the .mcp.md contract --------------------
+  const BASE_URL = "https://api.open-meteo.com";
+
+  const CITIES = [
+    { name: "Berlin", latitude: 52.52, longitude: 13.41 },
+    { name: "Tokyo", latitude: 35.68, longitude: 139.69 },
+    { name: "New York", latitude: 40.71, longitude: -74.01 },
+    { name: "Nairobi", latitude: -1.29, longitude: 36.82 },
+    { name: "Sydney", latitude: -33.87, longitude: 151.21 },
+  ];
+
+  // WMO weather codes -> a friendly label + emoji (per the Open-Meteo docs).
+  const WMO = {
+    0: ["Clear", "☀️"], 1: ["Mainly clear", "🌤️"], 2: ["Partly cloudy", "⛅"], 3: ["Overcast", "☁️"],
+    45: ["Fog", "🌫️"], 48: ["Rime fog", "🌫️"],
+    51: ["Light drizzle", "🌦️"], 53: ["Drizzle", "🌦️"], 55: ["Dense drizzle", "🌧️"],
+    61: ["Light rain", "🌦️"], 63: ["Rain", "🌧️"], 65: ["Heavy rain", "🌧️"],
+    71: ["Light snow", "🌨️"], 73: ["Snow", "🌨️"], 75: ["Heavy snow", "❄️"],
+    80: ["Showers", "🌦️"], 81: ["Showers", "🌧️"], 82: ["Violent showers", "⛈️"],
+    95: ["Thunderstorm", "⛈️"], 96: ["Thunderstorm + hail", "⛈️"], 99: ["Thunderstorm + hail", "⛈️"],
+  };
+  const describe = (code) => WMO[code] || ["—", "❓"];
+
+  // --- API call: GET /v1/forecast -------------------------------------------
+  async function getForecast({ latitude, longitude }) {
+    const params = new URLSearchParams({
+      latitude,
+      longitude,
+      current: "temperature_2m,weather_code,wind_speed_10m",
+      daily: "weather_code,temperature_2m_max,temperature_2m_min",
+      timezone: "auto",
+      forecast_days: "5",
+    });
+    const res = await fetch(`${BASE_URL}/v1/forecast?${params}`);
+    if (!res.ok) throw new Error(`Forecast request failed: ${res.status}`);
+    return res.json();
+  }
+
+  // --- Rendering -------------------------------------------------------------
+  const card = document.getElementById("card");
+
+  function renderForecast(city, data) {
+    const c = data.current;
+    const [label, icon] = describe(c.weather_code);
+    const unit = data.current_units.temperature_2m;
+
+    const days = data.daily.time.map((iso, i) => {
+      const dow = new Date(iso).toLocaleDateString("en", { weekday: "short" });
+      const [, dicon] = describe(data.daily.weather_code[i]);
+      return `
+        <div class="day">
+          <div class="dow">${dow}</div>
+          <div class="dicon">${dicon}</div>
+          <div class="hi">${Math.round(data.daily.temperature_2m_max[i])}°</div>
+          <div class="lo">${Math.round(data.daily.temperature_2m_min[i])}°</div>
+        </div>`;
+    }).join("");
+
+    card.innerHTML = `
+      <div class="now">
+        <div class="icon">${icon}</div>
+        <div>
+          <div class="temp">${Math.round(c.temperature_2m)}${unit}</div>
+          <div class="meta">${city.name} · ${label} · wind ${c.wind_speed_10m} ${data.current_units.wind_speed_10m}</div>
+        </div>
+      </div>
+      <div class="grid">${days}</div>`;
+  }
+
+  function setStatus(text) {
+    card.innerHTML = `<div class="status">${text}</div>`;
+  }
+
+  // --- Wire up city buttons --------------------------------------------------
+  const citiesEl = document.getElementById("cities");
+  let activeBtn = null;
+
+  async function load(city, btn) {
+    if (activeBtn) activeBtn.classList.remove("active");
+    btn.classList.add("active");
+    activeBtn = btn;
+    setStatus(`Loading ${city.name}…`);
+    try {
+      renderForecast(city, await getForecast(city));
+    } catch (err) {
+      setStatus(`Could not load ${city.name}: ${err.message}`);
+    }
+  }
+
+  CITIES.forEach((city, i) => {
+    const btn = document.createElement("button");
+    btn.textContent = city.name;
+    btn.onclick = () => load(city, btn);
+    citiesEl.appendChild(btn);
+    if (i === 0) load(city, btn); // auto-load the first city
+  });
+</script>
+</body>
+</html>
