@@ -1,6 +1,6 @@
 {
   "name": "spec2md",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Convert an OpenAPI/Swagger spec (file or live URL) into a clean Markdown API reference and a compact, token-efficient MCP context file for AI coding agents.",
   "bin": {
     "spec2md": "bin/spec2md.js"
